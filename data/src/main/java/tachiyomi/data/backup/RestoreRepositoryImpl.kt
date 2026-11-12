@@ -149,6 +149,11 @@ class RestoreRepositoryImpl(
                         read = kept.read || other.read,
                         bookmark = kept.bookmark || other.bookmark,
                         lastPageRead = max(kept.lastPageRead, other.lastPageRead),
+                        lastPageReadOffset = if (other.lastPageRead >= kept.lastPageRead) {
+                            other.lastPageReadOffset
+                        } else {
+                            kept.lastPageReadOffset
+                        },
                     )
                 }
             }
@@ -171,6 +176,11 @@ class RestoreRepositoryImpl(
                         read = chapter.read || dbChapter.read,
                         bookmark = chapter.bookmark || dbChapter.bookmark,
                         lastPageRead = max(chapter.lastPageRead, dbChapter.lastPageRead),
+                        lastPageReadOffset = if (chapter.lastPageRead >= dbChapter.lastPageRead) {
+                            chapter.lastPageReadOffset
+                        } else {
+                            dbChapter.lastPageReadOffset
+                        },
                         dateFetch = dbChapter.dateFetch,
                         sourceOrder = dbChapter.sourceOrder,
                         // Merge both backup and local data with local winning
@@ -188,6 +198,7 @@ class RestoreRepositoryImpl(
                 userRead = chapter.read,
                 userBookmark = chapter.bookmark,
                 userLastPageRead = chapter.lastPageRead,
+                userLastPageReadOffset = chapter.lastPageReadOffset,
                 remoteChapterNumber = chapter.chapterNumber,
                 remoteOrder = chapter.sourceOrder,
                 stateDateFetch = chapter.dateFetch,
@@ -201,6 +212,7 @@ class RestoreRepositoryImpl(
                 userRead = chapter.read,
                 userBookmark = chapter.bookmark,
                 userLastPageRead = chapter.lastPageRead,
+                userLastPageReadOffset = chapter.lastPageReadOffset,
                 id = chapter.id,
                 remoteMemo = chapter.memo,
             )

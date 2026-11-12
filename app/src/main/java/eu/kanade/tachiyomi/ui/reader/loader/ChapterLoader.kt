@@ -62,6 +62,7 @@ class ChapterLoader(
                 // otherwise use the requested page.
                 if (!chapter.chapter.read) {
                     chapter.requestedPage = chapter.chapter.lastPageRead
+                    chapter.requestedPageOffset = chapter.chapter.lastPageReadOffset
                 }
 
                 chapter.state = ReaderChapter.State.Loaded(pages)

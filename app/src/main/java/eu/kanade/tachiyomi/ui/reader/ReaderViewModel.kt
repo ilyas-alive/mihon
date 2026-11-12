@@ -183,6 +183,11 @@ class ReaderViewModel(
             savedState["page_index"] = value
             field = value
         }
+    private var chapterPageOffset = savedState.get<Int>("page_offset") ?: 0
+        set(value) {
+            savedState["page_offset"] = value
+            field = value
+        }
 
     /**
      * The chapter loader for the loaded manga. It'll be null until [manga] is set.
@@ -306,8 +311,10 @@ class ReaderViewModel(
                 if (chapterPageIndex >= 0) {
                     // Restore from SavedState
                     currentChapter.requestedPage = chapterPageIndex
+                    currentChapter.requestedPageOffset = chapterPageOffset
                 } else if (!currentChapter.chapter.read) {
                     currentChapter.requestedPage = currentChapter.chapter.lastPageRead
+                    currentChapter.requestedPageOffset = currentChapter.chapter.lastPageReadOffset
                 }
                 chapterId = currentChapter.chapter.id
             }
@@ -530,7 +537,7 @@ class ReaderViewModel(
      * read, update tracking services, enqueue downloaded chapter deletion, and updating the active chapter if this
      * [page]'s chapter is different from the currently active.
      */
-    fun onPageSelected(page: ReaderPage) {
+    fun onPageSelected(page: ReaderPage, pageOffset: Int = 0) {
         // InsertPage doesn't change page progress
         if (page is InsertPage) {
             return
@@ -540,7 +547,7 @@ class ReaderViewModel(
         val pages = selectedChapter.pages ?: return
 
         // Save last page read and mark as read if needed
-        updateChapterProgress(selectedChapter, page)
+        updateChapterProgress(selectedChapter, page, pageOffset)
 
         if (selectedChapter != getCurrentChapter()) {
             logcat { "Setting ${selectedChapter.chapter.url} as active" }
@@ -553,6 +560,11 @@ class ReaderViewModel(
         }
 
         eventChannel.trySend(Event.PageChanged)
+    }
+
+    fun onPageScrolled(page: ReaderPage, pageOffset: Int) {
+        if (page is InsertPage) return
+        updateChapterProgress(page.chapter, page, pageOffset)
     }
 
     private fun downloadNextChapters() {
@@ -640,21 +652,30 @@ class ReaderViewModel(
      * Completing a chapter is saved right away. Other page changes are saved once the reader settles on a page, or
      * when [saveChapterProgress] is called, so flipping through pages doesn't write to the database on every page.
      */
-    private fun updateChapterProgress(readerChapter: ReaderChapter, page: Page) {
+    private fun updateChapterProgress(readerChapter: ReaderChapter, page: Page, pageOffset: Int = 0) {
         val pageIndex = page.index
 
         mutableState.update {
             it.copy(currentPage = pageIndex + 1)
         }
         readerChapter.requestedPage = pageIndex
+        val normalizedPageOffset = pageOffset.coerceIn(0, 1000)
+        readerChapter.requestedPageOffset = normalizedPageOffset
         chapterPageIndex = pageIndex
+        chapterPageOffset = normalizedPageOffset
 
         if (incognitoMode || page.status is Page.State.Error) return
 
         val read = readerChapter.chapter.read || readerChapter.pages?.lastIndex == pageIndex
         // A page change in another chapter would replace that chapter's pending save
         if (pendingProgressChapter != readerChapter) saveChapterProgress()
-        readerChapter.update { it.copy(lastPageRead = pageIndex, read = read) }
+        readerChapter.update {
+            it.copy(
+                lastPageRead = pageIndex,
+                lastPageReadOffset = normalizedPageOffset,
+                read = read,
+            )
+        }
         pendingProgressSave?.cancel()
 
         if (readerChapter.pages?.lastIndex == pageIndex) {
@@ -692,6 +713,7 @@ class ReaderViewModel(
                     ChapterUpdate(chapter.id) {
                         read = chapter.read
                         lastPageRead = chapter.lastPageRead
+                        lastPageReadOffset = chapter.lastPageReadOffset
                     },
                 )
             }
